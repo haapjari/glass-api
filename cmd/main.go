@@ -9,17 +9,22 @@ import (
 )
 
 func main() {
-	c := cfg.NewConfig()
+	c, err := cfg.NewConfig()
+	if err != nil {
+		panic(err)
+	}
+
 	gin.SetMode(c.GinMode)
 
 	router := gin.Default()
-	logger := logger.NewLogger(logger.DebugLevel)
 
-	api.RegisterHandlers(router, srv.NewServer(logger))
+	log := logger.NewLogger(logger.DebugLevel)
 
-	err := router.Run("127.0.0.1" + ":" + c.Port)
+	api.RegisterHandlers(router, srv.NewServer(log, c))
+
+	err = router.Run("127.0.0.1" + ":" + c.Port)
 	if err != nil {
-		logger.Errorf("unable to run the server on port: %v, error: %v", c.Port, err.Error())
+		log.Errorf("unable to run the server on port: %v, error: %v", c.Port, err.Error())
 		return
 	}
 }

@@ -63,14 +63,12 @@ type Repository struct {
 
 // GetApiV1RepositoriesSearchParams defines parameters for GetApiV1RepositoriesSearch.
 type GetApiV1RepositoriesSearchParams struct {
-	// FirstCreationDate The first creation date of the range, in YYYY-MM-DD format.
+	// FirstCreationDate YYYY-MM-DD
 	FirstCreationDate string `form:"firstCreationDate" json:"firstCreationDate"`
 
-	// LastCreationDate The last creation date of the range, in YYYY-MM-DD format.
+	// LastCreationDate YYYY-MM-DD
 	LastCreationDate string `form:"lastCreationDate" json:"lastCreationDate"`
-
-	// Language The primary programming language of the repositories to search for.
-	Language string `form:"language" json:"language"`
+	Language         string `form:"language" json:"language"`
 
 	// Stars The number of stars a repository must have, e.g., ">100" for more than 100 stars.
 	Stars string `form:"stars" json:"stars"`
@@ -93,7 +91,6 @@ type GetApiV1RepositoriesSearchFirstCreationDateParams struct {
 
 // GetApiV1RepositoriesSearchLastCreationDateParams defines parameters for GetApiV1RepositoriesSearchLastCreationDate.
 type GetApiV1RepositoriesSearchLastCreationDateParams struct {
-	// Language The primary programming language of the repositories to search for.
 	Language string `form:"language" json:"language"`
 
 	// Stars Minimum number of stars a repository must have. e.g., ">100" for more than 100 stars.
@@ -530,11 +527,9 @@ type GetApiV1RepositoriesSearchFirstCreationDateResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		// FirstCreationDate Earliest creation date of from set of the repositories returned from the GitHub Search API.
 		FirstCreationDate *string `json:"firstCreationDate,omitempty"`
 	}
 	JSON400 *struct {
-		// Error Error Message.
 		Error *string `json:"error,omitempty"`
 	}
 	JSON403 *struct {
@@ -722,7 +717,6 @@ func ParseGetApiV1RepositoriesSearchFirstCreationDateResponse(rsp *http.Response
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			// FirstCreationDate Earliest creation date of from set of the repositories returned from the GitHub Search API.
 			FirstCreationDate *string `json:"firstCreationDate,omitempty"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -732,7 +726,6 @@ func ParseGetApiV1RepositoriesSearchFirstCreationDateResponse(rsp *http.Response
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest struct {
-			// Error Error Message.
 			Error *string `json:"error,omitempty"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -846,13 +839,13 @@ func ParseGetApiV1RepositoriesSearchLastCreationDateResponse(rsp *http.Response)
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// Abstraction for GitHub Search API, accepts Search API Queries with a Date Range.
+	// Abstraction of GitHub Search API.
 	// (GET /api/v1/repositories/search)
 	GetApiV1RepositoriesSearch(c *gin.Context, params GetApiV1RepositoriesSearchParams)
-	// Returns first creation date from the set of repositories.
+	// Returns first "Creation Date" from the set of repositories returned by the GitHub Search API.
 	// (GET /api/v1/repositories/search/firstCreationDate)
 	GetApiV1RepositoriesSearchFirstCreationDate(c *gin.Context, params GetApiV1RepositoriesSearchFirstCreationDateParams)
-	// Returns first creation date from the set of repositories.
+	// Returns last "Creation Date" from the set of repositories returned by the GitHub Search API.
 	// (GET /api/v1/repositories/search/lastCreationDate)
 	GetApiV1RepositoriesSearchLastCreationDate(c *gin.Context, params GetApiV1RepositoriesSearchLastCreationDateParams)
 }
@@ -1089,29 +1082,27 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

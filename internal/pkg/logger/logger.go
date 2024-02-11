@@ -1,15 +1,13 @@
 package logger
 
 import (
-	"fmt"
-	"log/slog"
-	"os"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type LogLevel string
 
 const (
-	// Define log level constants.
 	DebugLevel LogLevel = "DEBUG"
 	InfoLevel  LogLevel = "INFO"
 )
@@ -24,49 +22,71 @@ type Logger interface {
 
 // NewLogger creates a new instance of a Logger with specified log level.
 func NewLogger(level LogLevel) Logger {
-	var handlerOptions slog.HandlerOptions
-
-	// Enable source file logging.
-	handlerOptions.AddSource = true
-
-	// Setup the logger with a JSON handler and configure log level.
-	var handler slog.Handler
-	switch level {
-	case DebugLevel:
-		handlerOptions.Level = slog.LevelDebug
-	case InfoLevel:
-		handlerOptions.Level = slog.LevelInfo
-	default:
-		handlerOptions.Level = slog.LevelInfo // Default to Info level if unspecified.
+	encoderConfig := zapcore.EncoderConfig{
+		MessageKey:     "msg",
+		LevelKey:       "level",
+		TimeKey:        "ts",
+		NameKey:        "logger",
+		CallerKey:      "caller",
+		FunctionKey:    zapcore.OmitKey,
+		StacktraceKey:  "stacktrace",
+		LineEnding:     zapcore.DefaultLineEnding,
+		EncodeLevel:    zapcore.CapitalColorLevelEncoder,
+		EncodeTime:     zapcore.ISO8601TimeEncoder,
+		EncodeDuration: zapcore.StringDurationEncoder,
+		EncodeCaller:   zapcore.ShortCallerEncoder, // ShortCallerEncoder includes the file and line number
 	}
 
-	handler = slog.NewTextHandler(os.Stdout, &handlerOptions)
-	logger := slog.New(handler)
+	config := zap.Config{
+		Level:            zap.NewAtomicLevelAt(zap.InfoLevel),
+		Development:      true, // Enables DPanicLevel, and better stack traces
+		Encoding:         "console",
+		EncoderConfig:    encoderConfig,
+		OutputPaths:      []string{"stdout"},
+		ErrorOutputPaths: []string{"stderr"},
+	}
 
-	return &slogLogger{logger: logger}
+	// Adjust log level based on the input
+	switch level {
+	case DebugLevel:
+		config.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
+	case InfoLevel:
+		config.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
+	}
+
+	logger, err := config.Build(
+		zap.AddCaller(),
+		zap.AddStacktrace(zap.ErrorLevel),
+		zap.AddCallerSkip(1),
+	)
+	if err != nil {
+		panic("failed to initialize zap logger: " + err.Error())
+	}
+
+	return &zapLogger{logger: logger.Sugar()}
 }
 
-// slogLogger is an implementation of Logger interface using slog.
-type slogLogger struct {
-	logger *slog.Logger
+// zapLogger is an implementation of Logger interface using zap.
+type zapLogger struct {
+	logger *zap.SugaredLogger
 }
 
 // Debugf logs a debug message.
-func (l *slogLogger) Debugf(format string, args ...interface{}) {
-	l.logger.Debug(fmt.Sprintf(format, args...))
+func (l *zapLogger) Debugf(format string, args ...interface{}) {
+	l.logger.Debugf(format, args...)
 }
 
 // Errorf logs an error message.
-func (l *slogLogger) Errorf(format string, args ...interface{}) {
-	l.logger.Error(fmt.Sprintf(format, args...))
+func (l *zapLogger) Errorf(format string, args ...interface{}) {
+	l.logger.Errorf(format, args...)
 }
 
 // Infof logs an informational message.
-func (l *slogLogger) Infof(format string, args ...interface{}) {
-	l.logger.Info(fmt.Sprintf(format, args...))
+func (l *zapLogger) Infof(format string, args ...interface{}) {
+	l.logger.Infof(format, args...)
 }
 
 // Warnf logs a warning message.
-func (l *slogLogger) Warnf(format string, args ...interface{}) {
-	l.logger.Warn(fmt.Sprintf(format, args...))
+func (l *zapLogger) Warnf(format string, args ...interface{}) {
+	l.logger.Warnf(format, args...)
 }

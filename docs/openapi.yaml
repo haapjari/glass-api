@@ -3,12 +3,16 @@ openapi: 3.0.0
 info:
   title: Glass API
   version: 1.0.0
+  description: Glass API implements abstraction for GitHub's Search API. We are working around GitHub Search APIs pagination and 1000 results per request limitations, by querying data by date ranges.
 
 paths:
   /api/v1/repositories/search/firstCreationDate:
       get:
-        summary: Returns first creation date from the set of repositories.
-        description: Retrieves the creation dates of the earliest repository within a collection that meet the specified search criteria. This endpoint accepts query parameters to define the search conditions, returning the creation dates of the first and last repositories that match these parameters.
+        summary: Returns first "Creation Date" from the set of repositories returned by the GitHub Search API.
+        description:  Returns first "Creation Date" from the set of repositories returned by the GitHub Search API.
+        externalDocs:
+          description: GitHub Repository Search API Docs
+          url: https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28#search-repositories
         parameters:
           - in: query
             name: language
@@ -25,7 +29,7 @@ paths:
             example: ">100"
         responses:
           '200':
-            description: Successful Response
+            description: Successful
             content:
               application/json:
                 schema:
@@ -33,7 +37,6 @@ paths:
                   properties:
                     firstCreationDate:
                       type: string
-                      description: Earliest creation date of from set of the repositories returned from the GitHub Search API.
           '400':
             description: Bad Request 
             content:
@@ -43,7 +46,6 @@ paths:
                   properties:
                     error:
                       type: string
-                      description: Error Message.
 
           '403':
             description: Forbidden 
@@ -77,22 +79,23 @@ paths:
                     error:
                       type: string
                       description: Error Message.
-
         security:
           - ApiKeyAuth: [] 
 
   
   /api/v1/repositories/search/lastCreationDate:
       get:
-        summary: Returns first creation date from the set of repositories.
-        description: Retrieves the creation dates of the earliest repository within a collection that meet the specified search criteria. This endpoint accepts query parameters to define the search conditions, returning the creation dates of the first and last repositories that match these parameters.
+        summary: Returns last "Creation Date" from the set of repositories returned by the GitHub Search API.
+        description: Returns last "Creation Date" from the set of repositories returned by the GitHub Search API.
+        externalDocs:
+          description: GitHub Repository Search API Docs
+          url: https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28#search-repositories
         parameters:
           - in: query
             name: language
             schema:
               type: string
             required: true
-            description: The primary programming language of the repositories to search for.
           - in: query
             name: stars
             schema:
@@ -161,29 +164,31 @@ paths:
 
   /api/v1/repositories/search:
     get:
-      summary: Abstraction for GitHub Search API, accepts Search API Queries with a Date Range.
-      description: Abstraction for GitHub Search API, accepts Search API Queries with a Date Range. Optionally, GitHub Personal Access Token can be passed inside Authorization Header to ensure, that GitHub Rate Limits does not apply. Returns first 1000 repositories that match the query.
+      summary: Abstraction of GitHub Search API.
+      description: Abstraction of GitHub Search API.
+      externalDocs:
+        description: GitHub Repository Search API Docs
+        url: https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28#search-repositories
       parameters:
         - in: query
           name: firstCreationDate
           schema:
             type: string
           required: true
-          description: The first creation date of the range, in YYYY-MM-DD format.
+          description: YYYY-MM-DD
           example: "2013-05-01"
         - in: query
           name: lastCreationDate
           schema:
             type: string
           required: true
-          description: The last creation date of the range, in YYYY-MM-DD format.
+          description: YYYY-MM-DD
           example: "2013-05-01"
         - in: query
           name: language
           schema:
             type: string
           required: true
-          description: The primary programming language of the repositories to search for.
           example: Go
         - in: query
           name: stars
@@ -203,7 +208,7 @@ paths:
           example: desc
       responses:
         '200':
-          description: Successful Response
+          description: Successful
           content:
             application/json:
               schema:
@@ -297,11 +302,11 @@ components:
         open_issues_count:
           type: integer
         closed_issues_count:
-          type: integer  # This might require custom logic or additional API calls
+          type: integer
         open_pulls_count:
-          type: integer  # Custom implementation required
+          type: integer
         closed_pulls_count:
-          type: integer  # Custom implementation required
+          type: integer
         forks_count:
           type: integer
         subscribers_count:
@@ -309,11 +314,11 @@ components:
         watchers_count:
           type: integer
         commits_count:
-          type: integer  # Custom implementation required
+          type: integer
         events_count:
-          type: integer  # Custom implementation required
+          type: integer
         latest_release:
-          type: object  # You might need to detail this object more based on your needs
+          type: object
           properties:
             tag_name:
               type: string
@@ -321,13 +326,13 @@ components:
               type: string
               format: date-time
         total_releases_count:
-          type: integer  # Custom implementation required
+          type: integer
         contributors_count:
-          type: integer  # Custom implementation required
+          type: integer
         library_loc:
-          type: integer  # Custom implementation required
+          type: integer
         self_written_loc:
-          type: integer  # Custom implementation required
+          type: integer
       required:
         - id
         - name
@@ -335,4 +340,3 @@ components:
         - html_url
         - stargazers_count
         - language
-

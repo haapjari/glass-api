@@ -23,6 +23,7 @@ OpenAPI documentation is available at `docs/openapi.yaml`
 ```
     PORT=8080
     GIN_MODE=debug
+    GITHUB_QUERY_INTERVAL=1s
 ```
 
 ### Run
@@ -32,10 +33,6 @@ OpenAPI documentation is available at `docs/openapi.yaml`
 - Locally: `make run`
 
 ### Build
-
-- TBD
-
-### Dev
 
 - TBD
 
