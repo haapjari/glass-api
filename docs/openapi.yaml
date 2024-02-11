@@ -282,32 +282,26 @@ components:
     Repository:
       type: object
       properties:
-        id:
-          type: integer
         name:
           type: string
         full_name:
           type: string
-        html_url:
-          type: string
-        description:
-          type: string
-        creation_date:
+        created_at:
           type: string
           format: date-time
         stargazers_count:
           type: integer
         language:
           type: string
-        open_issues_count:
+        open_issues:
           type: integer
-        closed_issues_count:
+        closed_issues:
           type: integer
         open_pulls_count:
           type: integer
         closed_pulls_count:
           type: integer
-        forks_count:
+        forks:
           type: integer
         subscribers_count:
           type: integer
