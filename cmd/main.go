@@ -22,8 +22,7 @@ func main() {
 
 	api.RegisterHandlers(router, srv.NewServer(log, c))
 
-	err = router.Run("127.0.0.1" + ":" + c.Port)
-	if err != nil {
+	if err = router.Run("127.0.0.1" + ":" + c.Port); err != nil {
 		log.Errorf("unable to run the server on port: %v, error: %v", c.Port, err.Error())
 		return
 	}

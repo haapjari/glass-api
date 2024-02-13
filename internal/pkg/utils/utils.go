@@ -2,6 +2,7 @@ package utils
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -13,4 +14,14 @@ func ParseBearer(authHeader string) (string, error) {
 	}
 
 	return "", errors.New("not a valid header")
+}
+
+// ParseGitHubFullName godoc
+func ParseGitHubFullName(input string) (owner, name string, err error) {
+	parts := strings.Split(input, "/")
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("input must be in the format 'owner/name'")
+	}
+
+	return parts[0], parts[1], nil
 }

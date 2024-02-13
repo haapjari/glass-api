@@ -1,12 +1,15 @@
 package svc
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/google/go-github/v59/github"
 	"github.com/haapjari/glass-api/api"
 	"github.com/haapjari/glass-api/internal/pkg/cfg"
 	"github.com/haapjari/glass-api/internal/pkg/logger"
+	"github.com/haapjari/glass-api/internal/pkg/utils"
 	"io"
 	"net/http"
 	"time"
@@ -17,6 +20,7 @@ type RepositorySearchService struct {
 	gitHubPersonalAccessToken string
 	gitHubQueryInterval       time.Duration
 	httpClient                *http.Client
+	gitHubClient              *github.Client
 }
 
 type Count struct {
@@ -34,14 +38,21 @@ func NewRepositorySearchService(logger logger.Logger, config *cfg.Config, token 
 		return nil, err
 	}
 
+	httpClient := &http.Client{
+		Timeout: time.Duration(30) * time.Second,
+	}
+
 	return &RepositorySearchService{
 		log:                       logger,
 		gitHubPersonalAccessToken: token,
 		gitHubQueryInterval:       interval,
-		httpClient: &http.Client{
-			Timeout: time.Duration(30) * time.Second,
-		},
+		httpClient:                httpClient,
+		gitHubClient:              github.NewClient(httpClient).WithAuthToken(token),
 	}, nil
+}
+
+func (rss *RepositorySearchService) Populate() {
+	// TODO
 }
 
 // Search is an abstraction of GitHub Repository Search API.
@@ -86,21 +97,37 @@ func (rss *RepositorySearchService) Search(language string, stars string, firstC
 	if resp.StatusCode == 200 {
 		repositoryResponse := &RepositoryResponse{}
 
-		body, readError := io.ReadAll(resp.Body)
-		if readError != nil {
-			return nil, 0, 500, err
+		body, e := io.ReadAll(resp.Body)
+		if e != nil {
+			return nil, 0, 500, e
 		}
 
 		if err = json.Unmarshal(body, &repositoryResponse); err != nil {
 			return nil, 0, 500, err
 		}
 
+		// Populate Contributor Count.
+		// TODO: Create Populator Goroutine, and
+		for i := range len(repositoryResponse.Items) {
+			owner, name, loopErr := utils.ParseGitHubFullName(repositoryResponse.Items[i].FullName)
+			if loopErr != nil {
+				return nil, 0, 500, loopErr
+			}
+
+			rss.log.Debugf("[Owner: %v] [Name: %v] populating repository ", owner, name)
+
+			contributorCount, loopErr := rss.GetContributorCount(owner, name)
+			if loopErr != nil {
+				return nil, 0, 500, loopErr
+			}
+
+			repositoryResponse.Items[i].ContributorsCount = &contributorCount
+		}
+
 		// TODO: Query for These.
 		// latest_release
 		// total_releases_count
 		// contributors_count
-		// library_loc
-		// self_written_loc
 		// open_pulls_count
 		// closed_pulls_count
 		// subscribers_count
@@ -108,10 +135,42 @@ func (rss *RepositorySearchService) Search(language string, stars string, firstC
 		// events_count
 		// watchers
 
+		// library_loc
+		// self_written_loc
+
 		return repositoryResponse.Items, repositoryResponse.TotalCount, 200, nil
 	}
 
 	return nil, 0, 500, nil
+}
+
+// GetContributorCount godoc
+func (rss *RepositorySearchService) GetContributorCount(owner string, name string) (int, error) {
+	opt := &github.ListContributorsOptions{
+		ListOptions: github.ListOptions{
+			PerPage: 100,
+		},
+		Anon: "true",
+	}
+
+	var all []*github.Contributor
+
+	for {
+		contributors, resp, err := rss.gitHubClient.Repositories.ListContributors(context.Background(),
+			owner, name, opt)
+		if err != nil {
+			return -1, err
+		}
+
+		all = append(all, contributors...)
+		if resp.NextPage == 0 {
+			break
+		}
+
+		opt.Page = resp.NextPage
+	}
+
+	return len(all), nil
 }
 
 // LastCreationDate queries GitHub Search API and returns the last creation date matching the query parameters.
