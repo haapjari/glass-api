@@ -121,27 +121,43 @@ func (rss *RepositorySearchService) Search(language string, stars string, firstC
 				return nil, 0, 500, loopErr
 			}
 
+			latestRelease, loopErr := rss.GetLatestRelease(owner, name)
+			if loopErr != nil {
+				return nil, 0, 500, loopErr
+			}
+
+			// TODO: Query for These.
+
+			// total_releases_count
+			// contributors_count
+			// open_pulls_count
+			// closed_pulls_count
+			// subscribers_count
+			// commits_count
+			// events_count
+			// watchers
+
+			// library_loc
+			// self_written_loc
+
 			repositoryResponse.Items[i].ContributorsCount = &contributorCount
+			repositoryResponse.Items[i].LatestRelease = &latestRelease
 		}
-
-		// TODO: Query for These.
-		// latest_release
-		// total_releases_count
-		// contributors_count
-		// open_pulls_count
-		// closed_pulls_count
-		// subscribers_count
-		// commits_count
-		// events_count
-		// watchers
-
-		// library_loc
-		// self_written_loc
 
 		return repositoryResponse.Items, repositoryResponse.TotalCount, 200, nil
 	}
 
 	return nil, 0, 500, nil
+}
+
+// GetLatestRelease godoc
+func (rss *RepositorySearchService) GetLatestRelease(owner string, name string) (string, error) {
+	release, _, err := rss.gitHubClient.Repositories.GetLatestRelease(context.Background(), owner, name)
+	if err != nil {
+		return "", err
+	}
+
+	return release.GetCreatedAt().String(), nil
 }
 
 // GetContributorCount godoc

@@ -312,13 +312,7 @@ components:
         events_count:
           type: integer
         latest_release:
-          type: object
-          properties:
-            tag_name:
-              type: string
-            published_at:
-              type: string
-              format: date-time
+          type: string
         total_releases_count:
           type: integer
         contributors_count:
