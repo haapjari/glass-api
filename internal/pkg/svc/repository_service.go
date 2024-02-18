@@ -126,10 +126,18 @@ func (rss *RepositorySearchService) Search(language string, stars string, firstC
 				return nil, 0, 500, loopErr
 			}
 
+			totalReleases, loopErr := rss.GetTotalReleases(owner, name)
+			if loopErr != nil {
+				return nil, 0, 500, loopErr
+			}
+
+			openPullsCount, loopErr := rss.GetOpenPullRequests(owner, name)
+			if loopErr != nil {
+				return nil, 0, 500, loopErr
+			}
+
 			// TODO: Query for These.
 
-			// total_releases_count
-			// contributors_count
 			// open_pulls_count
 			// closed_pulls_count
 			// subscribers_count
@@ -142,12 +150,48 @@ func (rss *RepositorySearchService) Search(language string, stars string, firstC
 
 			repositoryResponse.Items[i].ContributorsCount = &contributorCount
 			repositoryResponse.Items[i].LatestRelease = &latestRelease
+			repositoryResponse.Items[i].TotalReleasesCount = &totalReleases
+			repositoryResponse.Items[i].OpenPullsCount = &openPullsCount
 		}
 
 		return repositoryResponse.Items, repositoryResponse.TotalCount, 200, nil
 	}
 
 	return nil, 0, 500, nil
+}
+
+// GetOpenPullRequests godoc
+func (rss *RepositorySearchService) GetOpenPullRequests(owner, name string) (int, error) {
+
+	// TODO https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#list-pull-requests
+
+	return -1, nil
+}
+
+// GetTotalReleases godoc
+func (rss *RepositorySearchService) GetTotalReleases(owner string, name string) (int, error) {
+	opt := &github.ListOptions{
+		Page:    1,
+		PerPage: 100,
+	}
+
+	var all []*github.RepositoryRelease
+
+	for {
+		releases, resp, err := rss.gitHubClient.Repositories.ListReleases(context.Background(), owner, name, opt)
+		if err != nil {
+			return -1, err
+		}
+
+		all = append(all, releases...)
+		if resp.NextPage == 0 {
+			break
+		}
+
+		opt.Page = resp.NextPage
+	}
+
+	return len(all), nil
 }
 
 // GetLatestRelease godoc
