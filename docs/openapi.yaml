@@ -309,7 +309,7 @@ components:
           type: integer
         commits_count:
           type: integer
-        events_count:
+        network_count:
           type: integer
         latest_release:
           type: string

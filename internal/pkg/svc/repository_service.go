@@ -12,9 +12,11 @@ import (
 	"github.com/haapjari/glass-api/internal/pkg/utils"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
+// TODO: Inspect Rate Limit Headers -> Workaround
 type RepositorySearchService struct {
 	log                       logger.Logger
 	gitHubPersonalAccessToken string
@@ -114,7 +116,7 @@ func (rss *RepositorySearchService) Search(language string, stars string, firstC
 				return nil, 0, 500, loopErr
 			}
 
-			rss.log.Debugf("[Owner: %v] [Name: %v] populating repository ", owner, name)
+			rss.log.Debugf("[Owner: %v] [Name: %v] populating repo ", owner, name)
 
 			contributorCount, loopErr := rss.GetContributorCount(owner, name)
 			if loopErr != nil {
@@ -136,22 +138,59 @@ func (rss *RepositorySearchService) Search(language string, stars string, firstC
 				return nil, 0, 500, loopErr
 			}
 
-			// TODO: Query for These.
+			closedPullsCount, loopErr := rss.GetClosedPullRequests(owner, name)
+			if loopErr != nil {
+				return nil, 0, 500, loopErr
+			}
 
-			// open_pulls_count
-			// closed_pulls_count
-			// subscribers_count
-			// commits_count
-			// events_count
-			// watchers
+			req, err = http.NewRequest("GET", fmt.Sprintf("https://api.github.com/repos/%s/%s",
+				owner, name), nil)
+			if err != nil {
+				return nil, 0, 500, err
+			}
 
-			// library_loc
-			// self_written_loc
+			resp, err = rss.httpClient.Do(req)
+			if err != nil {
+				return nil, 0, 500, err
+			}
+
+			repo := Repository{}
+
+			if resp.StatusCode == 200 {
+				if err = json.NewDecoder(resp.Body).Decode(&repo); err != nil {
+					if err != nil {
+						return nil, 0, 500, err
+					}
+				}
+			}
+
+			err = resp.Body.Close()
+			if err != nil {
+				return nil, 0, 500, err
+			}
+
+			commitsCount, loopErr := rss.GetCommitsCount(owner, name)
+			if loopErr != nil {
+				return nil, 0, 500, loopErr
+			}
+
+			// TODO
+			selfWrittenLOC, libraryLOC, loopErr := rss.GetLinesOfCode(name, repo.GitURL)
+			if loopErr != nil {
+				return nil, 0, 500, loopErr
+			}
 
 			repositoryResponse.Items[i].ContributorsCount = &contributorCount
 			repositoryResponse.Items[i].LatestRelease = &latestRelease
 			repositoryResponse.Items[i].TotalReleasesCount = &totalReleases
 			repositoryResponse.Items[i].OpenPullsCount = &openPullsCount
+			repositoryResponse.Items[i].ClosedPullsCount = &closedPullsCount
+			repositoryResponse.Items[i].SubscribersCount = &repo.SubscribersCount
+			repositoryResponse.Items[i].CommitsCount = &commitsCount
+			repositoryResponse.Items[i].NetworkCount = &repo.NetworkCount
+			repositoryResponse.Items[i].WatchersCount = &repo.Watchers
+			repositoryResponse.Items[i].SelfWrittenLoc = &selfWrittenLOC
+			repositoryResponse.Items[i].LibraryLoc = &libraryLOC
 		}
 
 		return repositoryResponse.Items, repositoryResponse.TotalCount, 200, nil
@@ -160,12 +199,159 @@ func (rss *RepositorySearchService) Search(language string, stars string, firstC
 	return nil, 0, 500, nil
 }
 
+// GetLinesOfCode returns "Self-Written LOC" and "Library LOC".
+func (rss *RepositorySearchService) GetLinesOfCode(name, remote string) (int, int, error) {
+	remote = strings.Replace(remote, "git://", "https://", 1)
+	dir := "/" + "tmp" + "/" + name
+
+	repo := NewRepo(remote, dir, name)
+
+	rss.log.Debugf("Cloning Repository: %v", remote)
+
+	err := repo.Clone()
+	if err != nil {
+		return -1, -1, err
+	}
+
+	selfWrittenLOC, err := repo.SelfWrittenLOC()
+	if err != nil {
+		return -1, -1, err
+	}
+
+	libraryLOC, err := repo.LibraryLOC()
+	if err != nil {
+		return -1, -1, err
+	}
+
+	time.Sleep(5 * time.Second)
+
+	rss.log.Debugf("Deleting Repository: %v", remote)
+
+	err = repo.Delete()
+	if err != nil {
+		return -1, -1, err
+	}
+
+	return selfWrittenLOC, libraryLOC, nil
+}
+
+// GetCommitsCount godoc
+func (rss *RepositorySearchService) GetCommitsCount(owner, repo string) (int, error) {
+	page := 1
+	count := 0
+
+	for {
+		url := fmt.Sprintf("https://api.github.com/repos/%s/%s/commits?per_page=100&page=%d", owner, repo, page)
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			return 0, err
+		}
+
+		resp, err := rss.httpClient.Do(req)
+		if err != nil {
+			return count, err
+		}
+
+		defer func() { _ = resp.Body.Close() }()
+
+		if resp.StatusCode == 200 {
+			var commits []interface{}
+			if err = json.NewDecoder(resp.Body).Decode(&commits); err != nil {
+				return count, err
+			}
+
+			count += len(commits)
+
+			if linkHeader := resp.Header.Get("Link"); !strings.Contains(linkHeader, `rel="next"`) {
+				break
+			}
+
+			page++
+		} else {
+			return count, fmt.Errorf("GitHub API error: %s", resp.Status)
+		}
+	}
+
+	return count, nil
+}
+
 // GetOpenPullRequests godoc
-func (rss *RepositorySearchService) GetOpenPullRequests(owner, name string) (int, error) {
+func (rss *RepositorySearchService) GetOpenPullRequests(owner, repo string) (int, error) {
 
-	// TODO https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#list-pull-requests
+	page := 1
+	count := 0
 
-	return -1, nil
+	for {
+		req, err := http.NewRequest("GET",
+			fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls?state=open&per_page=100&page=%d",
+				owner, repo, page), nil)
+		if err != nil {
+			return 0, err
+		}
+
+		resp, e := rss.httpClient.Do(req)
+		if e != nil {
+			return count, e
+		}
+
+		defer func() { _ = resp.Body.Close() }()
+
+		if resp.StatusCode == 200 {
+			var pullRequests []interface{}
+			if err = json.NewDecoder(resp.Body).Decode(&pullRequests); err != nil {
+				return count, err
+			}
+
+			count += len(pullRequests)
+
+			if linkHeader := resp.Header.Get("Link"); !strings.Contains(linkHeader, `rel="next"`) {
+				break
+			} else {
+				page = page + 1
+			}
+		}
+	}
+
+	return count, nil
+}
+
+// GetClosedPullRequests godoc
+func (rss *RepositorySearchService) GetClosedPullRequests(owner, repo string) (int, error) {
+	page := 1
+	count := 0
+
+	for {
+		req, err := http.NewRequest("GET",
+			fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls?state=closed&per_page=100&page=%d",
+				owner, repo, page), nil)
+		if err != nil {
+			return 0, err
+		}
+
+		resp, e := rss.httpClient.Do(req)
+		if e != nil {
+			return count, e
+		}
+
+		defer func() { _ = resp.Body.Close() }()
+
+		if resp.StatusCode == 200 {
+			var pullRequests []interface{}
+			if err = json.NewDecoder(resp.Body).Decode(&pullRequests); err != nil {
+				return count, err
+			}
+
+			count += len(pullRequests)
+
+			if linkHeader := resp.Header.Get("Link"); !strings.Contains(linkHeader, `rel="next"`) {
+				break
+			} else {
+				page = page + 1
+			}
+		}
+	}
+
+	return count, nil
 }
 
 // GetTotalReleases godoc
