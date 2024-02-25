@@ -18,7 +18,9 @@ import (
 	"github.com/haapjari/glass-api/internal/pkg/utils"
 )
 
-// TODO: Inspect Rate Limit Headers -> Workaround
+// TODO: Inspect Rate Limit Headers -> Workaround.
+
+// RepositorySearchService godoc.
 type RepositorySearchService struct {
 	log logger.Logger
 	// TODO: Expose this username
@@ -228,7 +230,8 @@ func (rss *RepositorySearchService) GetLinesOfCode(name, remote string) (int, in
 		return -1, -1, err
 	}
 
-	repo := NewRepo(remote, dir, name, rss.gitHubUsername, rss.gitHubPersonalAccessToken)
+	repo := NewRepo(remote, dir, name, rss.gitHubUsername,
+		rss.gitHubPersonalAccessToken, rss.log)
 
 	rss.log.Debugf("Cloning Repository '%v' into %v.", remote, dir)
 
@@ -240,15 +243,14 @@ func (rss *RepositorySearchService) GetLinesOfCode(name, remote string) (int, in
 	selfWrittenLOC, err := repo.SelfWrittenLOC()
 	if err != nil {
 		rss.log.Errorf("unable to calculate self-written loc: %s", err.Error())
+
 		return -1, -1, err
 	}
-	//
-	// 	libraryLOC, err := repo.LibraryLOC()
-	// 	if err != nil {
-	// 		return -1, -1, err
-	// 	}
 
-	time.Sleep(5 * time.Second)
+	libraryLOC, err := repo.CalculateLibraryLOC()
+	if err != nil {
+		return -1, -1, err
+	}
 
 	rss.log.Debugf("Deleting Repository '%v', from %v", remote, dir)
 
@@ -257,7 +259,7 @@ func (rss *RepositorySearchService) GetLinesOfCode(name, remote string) (int, in
 		return -1, -1, err
 	}
 
-	return selfWrittenLOC, -1, nil
+	return selfWrittenLOC, libraryLOC, nil
 }
 
 // GetCommitsCount godoc
@@ -463,7 +465,7 @@ func (rss *RepositorySearchService) LastCreationDate(language string, stars stri
 		return "", 500, e
 	}
 
-	totalCount := -1
+	var totalCount int
 
 	for {
 		select {
@@ -556,7 +558,7 @@ func (rss *RepositorySearchService) findFirstYear(language string, stars string)
 		return -1, e
 	}
 
-	totalCount := -1
+	var totalCount int
 
 	for {
 		select {

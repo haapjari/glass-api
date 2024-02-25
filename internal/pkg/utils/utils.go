@@ -3,6 +3,8 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -24,4 +26,30 @@ func ParseGitHubFullName(input string) (owner, name string, err error) {
 	}
 
 	return parts[0], parts[1], nil
+}
+
+// FindFile recursively searches for a file named `filename` starting from `path`.
+// It returns the full path to the file if found, or an empty string and an error if not found.
+func FindFile(path, fileName string) (string, error) {
+	var foundPath string
+	err := filepath.Walk(path, func(currentPath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.Name() == fileName {
+			foundPath = currentPath
+			return filepath.SkipDir
+		}
+		return nil
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	if foundPath == "" {
+		return "", os.ErrNotExist
+	}
+
+	return foundPath, nil
 }
