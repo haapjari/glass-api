@@ -14,6 +14,8 @@ func main() {
 		panic(err)
 	}
 
+	cfg.NewConfig()
+
 	gin.SetMode(c.GinMode)
 
 	router := gin.Default()
@@ -23,7 +25,8 @@ func main() {
 	api.RegisterHandlers(router, srv.NewServer(log, c))
 
 	if err = router.Run("127.0.0.1" + ":" + c.Port); err != nil {
-		log.Errorf("unable to run the server on port: %v, error: %v", c.Port, err.Error())
+		log.Errorf("unable to run the server on port: %v, error: %v", c.Port,
+			err.Error())
 		return
 	}
 }

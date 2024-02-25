@@ -1,29 +1,41 @@
 package svc
 
 import (
-	"github.com/go-git/go-git/v5"
 	"os"
+
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/hhatto/gocloc"
 )
 
 type Repo struct {
-	url  string
-	dir  string
-	name string
+	gitRemote      string
+	localDirectory string
+	repositoryName string
+	githubUser     string
+	githubToken    string
 }
 
-func NewRepo(url, dir, name string) *Repo {
+func NewRepo(url, dir, name, ghUser, ghToken string) *Repo {
 	return &Repo{
-		url:  url,
-		dir:  dir,
-		name: name,
+		gitRemote:      url,
+		localDirectory: dir,
+		repositoryName: name,
+		githubUser:     ghUser,
+		githubToken:    ghToken,
 	}
 }
 
 // Clone godoc
 func (r *Repo) Clone() error {
-	_, err := git.PlainClone(r.dir, false, &git.CloneOptions{
-		URL:      r.url,
+	auth := &http.BasicAuth{
+		Username: r.githubUser,
+		Password: r.githubToken,
+	}
+	_, err := git.PlainClone(r.localDirectory, false, &git.CloneOptions{
+		URL:      r.gitRemote,
 		Progress: os.Stdout,
+		Auth:     auth,
 	})
 	if err != nil {
 		return err
@@ -34,7 +46,7 @@ func (r *Repo) Clone() error {
 
 // Delete godoc
 func (r *Repo) Delete() error {
-	err := os.RemoveAll(r.dir)
+	err := os.RemoveAll(r.localDirectory)
 	if err != nil {
 		return err
 	}
@@ -43,7 +55,21 @@ func (r *Repo) Delete() error {
 }
 
 func (r *Repo) SelfWrittenLOC() (int, error) {
-	return -1, nil
+	languages := gocloc.NewDefinedLanguages()
+	options := gocloc.NewClocOptions()
+
+	paths := []string{
+		r.localDirectory,
+	}
+
+	processor := gocloc.NewProcessor(languages, options)
+
+	result, err := processor.Analyze(paths)
+	if err != nil {
+		return -1, nil
+	}
+
+	return int(result.Total.Code), nil
 }
 
 func (r *Repo) LibraryLOC() (int, error) {

@@ -5,7 +5,9 @@ go 1.22
 require (
 	github.com/getkin/kin-openapi v0.123.0
 	github.com/gin-gonic/gin v1.9.1
+	github.com/go-git/go-git/v5 v5.11.0
 	github.com/google/go-github/v59 v59.0.0
+	github.com/hhatto/gocloc v0.5.2
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/spf13/viper v1.18.2
 	go.uber.org/zap v1.26.0
@@ -25,9 +27,10 @@ require (
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
+	github.com/go-enry/go-enry/v2 v2.8.0 // indirect
+	github.com/go-enry/go-oniguruma v1.2.1 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.5.0 // indirect
-	github.com/go-git/go-git/v5 v5.11.0 // indirect
 	github.com/go-openapi/jsonpointer v0.20.2 // indirect
 	github.com/go-openapi/swag v0.22.8 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect

@@ -5,20 +5,24 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/google/go-github/v59/github"
 	"github.com/haapjari/glass-api/api"
 	"github.com/haapjari/glass-api/internal/pkg/cfg"
 	"github.com/haapjari/glass-api/internal/pkg/logger"
 	"github.com/haapjari/glass-api/internal/pkg/utils"
-	"io"
-	"net/http"
-	"strings"
-	"time"
 )
 
 // TODO: Inspect Rate Limit Headers -> Workaround
 type RepositorySearchService struct {
-	log                       logger.Logger
+	log logger.Logger
+	// TODO: Expose this username
+	gitHubUsername            string
 	gitHubPersonalAccessToken string
 	gitHubQueryInterval       time.Duration
 	httpClient                *http.Client
@@ -49,7 +53,9 @@ func NewRepositorySearchService(logger logger.Logger, config *cfg.Config, token 
 		gitHubPersonalAccessToken: token,
 		gitHubQueryInterval:       interval,
 		httpClient:                httpClient,
-		gitHubClient:              github.NewClient(httpClient).WithAuthToken(token),
+		gitHubClient: github.NewClient(httpClient).
+			WithAuthToken(token),
+		gitHubUsername: config.GitHubUser,
 	}, nil
 }
 
@@ -120,37 +126,44 @@ func (rss *RepositorySearchService) Search(language string, stars string, firstC
 
 			contributorCount, loopErr := rss.GetContributorCount(owner, name)
 			if loopErr != nil {
+				rss.log.Errorf("unable to get contributor count: %s", loopErr.Error())
 				return nil, 0, 500, loopErr
 			}
 
 			latestRelease, loopErr := rss.GetLatestRelease(owner, name)
 			if loopErr != nil {
+				rss.log.Errorf("unable to get latest release: %s", loopErr.Error())
 				return nil, 0, 500, loopErr
 			}
 
 			totalReleases, loopErr := rss.GetTotalReleases(owner, name)
 			if loopErr != nil {
+				rss.log.Errorf("unable to get total releases: %s", loopErr.Error())
 				return nil, 0, 500, loopErr
 			}
 
 			openPullsCount, loopErr := rss.GetOpenPullRequests(owner, name)
 			if loopErr != nil {
+				rss.log.Errorf("unable to get open pull requests: %s", loopErr.Error())
 				return nil, 0, 500, loopErr
 			}
 
 			closedPullsCount, loopErr := rss.GetClosedPullRequests(owner, name)
 			if loopErr != nil {
+				rss.log.Errorf("unable to get closed pull requests: %s", loopErr.Error())
 				return nil, 0, 500, loopErr
 			}
 
 			req, err = http.NewRequest("GET", fmt.Sprintf("https://api.github.com/repos/%s/%s",
 				owner, name), nil)
 			if err != nil {
+				rss.log.Errorf("unable to construct http request: %s", err.Error())
 				return nil, 0, 500, err
 			}
 
 			resp, err = rss.httpClient.Do(req)
 			if err != nil {
+				rss.log.Errorf("unable to execute http request: %s", err.Error())
 				return nil, 0, 500, err
 			}
 
@@ -159,6 +172,7 @@ func (rss *RepositorySearchService) Search(language string, stars string, firstC
 			if resp.StatusCode == 200 {
 				if err = json.NewDecoder(resp.Body).Decode(&repo); err != nil {
 					if err != nil {
+						rss.log.Errorf("unable to decode response %s", err.Error())
 						return nil, 0, 500, err
 					}
 				}
@@ -166,17 +180,21 @@ func (rss *RepositorySearchService) Search(language string, stars string, firstC
 
 			err = resp.Body.Close()
 			if err != nil {
+				rss.log.Errorf("unable to close body: %s", err.Error())
 				return nil, 0, 500, err
 			}
 
 			commitsCount, loopErr := rss.GetCommitsCount(owner, name)
 			if loopErr != nil {
+				rss.log.Errorf("unable to get commits count: %s", loopErr.Error())
 				return nil, 0, 500, loopErr
 			}
 
-			// TODO
+			// TODO: There is an error, "GetLinesOfCode" requires access to
+			// authentication.
 			selfWrittenLOC, libraryLOC, loopErr := rss.GetLinesOfCode(name, repo.GitURL)
 			if loopErr != nil {
+				rss.log.Errorf("unable to get : %s", loopErr.Error())
 				return nil, 0, 500, loopErr
 			}
 
@@ -191,6 +209,8 @@ func (rss *RepositorySearchService) Search(language string, stars string, firstC
 			repositoryResponse.Items[i].WatchersCount = &repo.Watchers
 			repositoryResponse.Items[i].SelfWrittenLoc = &selfWrittenLOC
 			repositoryResponse.Items[i].LibraryLoc = &libraryLOC
+			repositoryResponse.Items[i].SelfWrittenLoc = &selfWrittenLOC
+			repositoryResponse.Items[i].LibraryLoc = &libraryLOC
 		}
 
 		return repositoryResponse.Items, repositoryResponse.TotalCount, 200, nil
@@ -202,37 +222,42 @@ func (rss *RepositorySearchService) Search(language string, stars string, firstC
 // GetLinesOfCode returns "Self-Written LOC" and "Library LOC".
 func (rss *RepositorySearchService) GetLinesOfCode(name, remote string) (int, int, error) {
 	remote = strings.Replace(remote, "git://", "https://", 1)
-	dir := "/" + "tmp" + "/" + name
+	baseDir := os.TempDir()
+	dir, err := os.MkdirTemp(baseDir, name+"-*")
+	if err != nil {
+		return -1, -1, err
+	}
 
-	repo := NewRepo(remote, dir, name)
+	repo := NewRepo(remote, dir, name, rss.gitHubUsername, rss.gitHubPersonalAccessToken)
 
-	rss.log.Debugf("Cloning Repository: %v", remote)
+	rss.log.Debugf("Cloning Repository '%v' into %v.", remote, dir)
 
-	err := repo.Clone()
+	err = repo.Clone()
 	if err != nil {
 		return -1, -1, err
 	}
 
 	selfWrittenLOC, err := repo.SelfWrittenLOC()
 	if err != nil {
+		rss.log.Errorf("unable to calculate self-written loc: %s", err.Error())
 		return -1, -1, err
 	}
-
-	libraryLOC, err := repo.LibraryLOC()
-	if err != nil {
-		return -1, -1, err
-	}
+	//
+	// 	libraryLOC, err := repo.LibraryLOC()
+	// 	if err != nil {
+	// 		return -1, -1, err
+	// 	}
 
 	time.Sleep(5 * time.Second)
 
-	rss.log.Debugf("Deleting Repository: %v", remote)
+	rss.log.Debugf("Deleting Repository '%v', from %v", remote, dir)
 
 	err = repo.Delete()
 	if err != nil {
 		return -1, -1, err
 	}
 
-	return selfWrittenLOC, libraryLOC, nil
+	return selfWrittenLOC, -1, nil
 }
 
 // GetCommitsCount godoc

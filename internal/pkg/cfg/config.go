@@ -8,6 +8,7 @@ type Config struct {
 	Port                string
 	GinMode             string
 	GitHubQueryInterval string
+	GitHubUser          string
 }
 
 func NewConfig() (*Config, error) {
@@ -21,5 +22,6 @@ func NewConfig() (*Config, error) {
 		Port:                viper.GetString("PORT"),
 		GinMode:             viper.GetString("GIN_MODE"),
 		GitHubQueryInterval: viper.GetString("GITHUB_QUERY_INTERVAL"),
+		GitHubUser:          viper.GetString("GITHUB_USER"),
 	}, nil
 }

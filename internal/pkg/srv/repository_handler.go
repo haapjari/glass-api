@@ -2,6 +2,7 @@ package srv
 
 import (
 	"fmt"
+
 	"github.com/gin-gonic/gin"
 	"github.com/haapjari/glass-api/api"
 	"github.com/haapjari/glass-api/internal/pkg/svc"
@@ -37,7 +38,7 @@ func (s *Server) GetApiV1RepositoriesSearch(ctx *gin.Context, params api.GetApiV
 
 	repositories, count, status, err := service.Search(language, stars, firstCreationDate, lastCreationDate, order)
 	if err != nil {
-		s.log.Errorf("error, while querying for first creation date: %s", err.Error())
+		s.log.Errorf("error, while executing 'search': %s", err.Error())
 		ctx.IndentedJSON(status, &ErrorResponse{Error: err.Error()})
 		return
 	}
