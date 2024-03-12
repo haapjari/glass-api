@@ -4,6 +4,7 @@ package svc
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
@@ -37,8 +38,6 @@ func NewRepo(url, dir, name, user, token string, logger logger.Logger) *Repo {
 		tasks:          make(chan string),
 		log:            logger,
 	}
-
-	// r.CalculateService()
 
 	return r
 }
@@ -118,8 +117,27 @@ func (r *Repo) CalculateLibraryLOC() (int, error) {
 
 	// libraries are in format of golang.org/x/mod v0.15.0
 
+	// libraryCount := 0
+
+	goPath, err := exec.Command("go", "env", "GOPATH").Output()
+	if err != nil {
+		r.log.Errorf("unable to exec command: %s", err.Error())
+
+		return 0, err
+	}
+
 	for _, lib := range modFile.Replace {
-		r.log.Debugf("Library: %v", lib)
+		l := strings.Split(lib, " ")
+		name := l[0]
+		version := l[1]
+
+		before, _, ok := strings.Cut(string(goPath), "\n")
+		if ok {
+			libraryPath := before + "/" + "pkg" + "/" + "mod" + "/" + name + "@" + version
+
+			// r.log.Debugf("go get -v %s@%s", name, version)
+			r.log.Debugf("Library Path: %s", libraryPath)
+		}
 	}
 
 	for _, lib := range modFile.Require {
@@ -127,12 +145,20 @@ func (r *Repo) CalculateLibraryLOC() (int, error) {
 		name := l[0]
 		version := l[1]
 
-		r.log.Debugf("Library Name: %v, Library Version: %v", name, version)
+		before, _, ok := strings.Cut(string(goPath), "\n")
+		if ok {
+			libraryPath := before + "/" + "pkg" + "/" + "mod" + "/" + name + "@" + version
 
-		// execute go get "golang.org/x/tools@version"
-		// vendor/golang.org/x/tools
-		// $GOPATH
+			// r.log.Debugf("go get -v %s@%s", name, version)
+			r.log.Debugf("Library Path: %s", libraryPath)
+		}
 	}
+
+	// mkdir tmp
+	// cd tmp && go mod init temp
+	//
+
+	// $(go env GOPATH)/pkg/mod
 
 	// TODO
 	// parse libraries from go.mod file

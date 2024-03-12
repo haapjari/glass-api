@@ -33,12 +33,4 @@ OpenAPI documentation is available at `docs/openapi.yaml`
 - Docker: TODO
 - Locally: `make run`
 
-### Build
-
-- TBD
-
-### Test
-
-- TBD
-
 ---
